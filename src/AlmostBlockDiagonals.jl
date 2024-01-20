@@ -397,15 +397,5 @@ function backward_substitution(w, ipivot, ncol, last, x)
 end
 
 export AlmostBlockDiagonal, IntermediateAlmostBlockDiagonal
-export slvblk
 
 end
-
-
-#=
-
-
-iflag = 1
-x = zeros(Float64, 11)
-slvblk(A, OB, ipivot, x, iflag)
-=#
