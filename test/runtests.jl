@@ -1,7 +1,7 @@
 using AlmostBlockDiagonals
 using Test
 
-@testset "AlmostBlockDiagonals.jl" begin
+@testset "Test Linear Solve in AlmostBlockDiagonals.jl" begin
     a1 = [ 0.1   2.0  -0.1  -0.1
     0.2  -0.2  -0.2   4.0
     -1.0   0.3  -0.3   0.3]
