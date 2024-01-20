@@ -10,7 +10,7 @@
 [![ColPrac: Contributor's Guide on Collaborative Practices for Community Packages](https://img.shields.io/badge/ColPrac-Contributor%27s%20Guide-blueviolet)](https://github.com/SciML/ColPrac)
 [![SciML Code Style](https://img.shields.io/static/v1?label=code%20style&message=SciML&color=9558b2&labelColor=389826)](https://github.com/SciML/SciMLStyle)
 
-Pivoting factorization and linear solver for almost block diagonal matrices. Mainly designed for linear solving in [BoundaryValueDiffEq.jl](https://github.com/SciML/BoundaryValueDiffEq.jl). Users who only want to use this package should pay attention.
+Partial pivoting LU factorization and linear solver for almost block diagonal matrices. Mainly designed for linear solving in [BoundaryValueDiffEq.jl](https://github.com/SciML/BoundaryValueDiffEq.jl). Users who only want to use this package should use with caution.
 
 ```julia
 a1 = [ 0.1   2.0  -0.1  -0.1
