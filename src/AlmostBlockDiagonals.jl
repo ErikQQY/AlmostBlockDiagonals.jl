@@ -6,7 +6,7 @@ import Base.\
 """
     AlmostBlockDiagonal(T, V<:AbstractMatrix{T}) < AbstractMatrix{T}
 
-A matrix with matrices on the diagonal, but not strictly has their corner against each other.
+A matrix with block matrices on the diagonal, but not strictly has their corner against each other.
 
 For example:
 
@@ -28,6 +28,9 @@ can be abstracted as:
 ```julia
 julia> AlmostBlockDiagonal([rand(3,4),rand(2,4),rand(2,4),rand(3,4)], [2,2,2,4])
 ```
+
+Here, the first argument is the fillers in the almost block diagonal matrix, the second argument is the structure
+of the almost block diagonal matrix, which is the offset of each adjacent block.
 
 ! note
     The column of block `ncol` and row of block `nrow` must satisfy: `ncol` ≥ `nrow`.
@@ -65,7 +68,6 @@ use for pivoting LU factorization.
 
     function IntermediateAlmostBlockDiagonal{T, I, V}(blocks::Vector{V}, lasts, rows, cols, fillers) where {T, I, V <: AbstractMatrix{T}}
         return new{T, I, V}(blocks, lasts, rows, cols, fillers)
-        
     end
 end
 
@@ -81,7 +83,7 @@ IntermediateAlmostBlockDiagonal(A::IntermediateAlmostBlockDiagonal) = A
 """
 
 Convert a `AlmostBlockDiagonal` matrix to an intermediate form to
-do factorization
+do the factorization and solving
 
 ! note
     Only for the square almost diagonal matrix of course
@@ -107,10 +109,7 @@ end
 blocks(A::AlmostBlockDiagonal) = A.blocks
 
 blocksize(A::AlmostBlockDiagonal, p::Integer) = size(blocks(A)[p])
-function blocksize(A::AlmostBlockDiagonal, p::Integer, q::Integer)
-    return size(blocks(A)[p], 1), size(blocks(A)[q], 2)
-end
-
+blocksize(A::AlmostBlockDiagonal, p::Integer, q::Integer)=size(blocks(A)[p], 1), size(blocks(A)[q], 2)
 
 """
     nblocks(A::AlmostBlockDiagonal[, dim])
@@ -198,202 +197,205 @@ end
 function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T2}
     iflag = 1
     IA = IntermediateAlmostBlockDiagonal(A)
-    x = zeros(T, size(A)[1])
-    B = preprocess_B(A, IA, B)
+    scrtch = zeros(T2, length(B))
     ipivot = zeros(Integer, length(B))
-    fcblok(IA, ipivot, x, iflag)
+    @views factor_shift(IA, ipivot, scrtch)
     (iflag == 0) && return
-    substitution(IA, ipivot, B, x)
-    return x
+    @views substitution(IA, ipivot, B)
+    return B
 end
 
-function preprocess_B(A::AlmostBlockDiagonal, IA::IntermediateAlmostBlockDiagonal, B::AbstractArray)
-    offset = IA.fillers
-    accumulate_rows = cumsum(A.rows)
-    newB = B[1:accumulate_rows[1]]
-    for i in 2:length(IA.rows)
-        if offset[i-1] !== 0
-            tmpB = vcat(zeros(offset[i-1]), B[(accumulate_rows[i-1]+1):accumulate_rows[i]])
-            newB = vcat(newB, tmpB)
-        else
-            newB = vcat(newB, B[(accumulate_rows[i-1]+1):accumulate_rows[i]])
-        end
-    end
-    return newB
-end
-
-function fcblok(IA, ipivot, scrtch, iflag)
-    iflag = 1
-    indexb = 1
+function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractArray{I}, scrtch) where {I <: Integer, T}
+    info = 0
+    indexx = 1
     i = 1
     nbloks = nblocks(IA)
-    while true    
+
+    while true
         nrow = IA.rows[i]
         ncol = IA.cols[i]
         last = IA.lasts[i]
 
-        @views blok = IA[i]
-        @views factor(blok, ipivot[indexb:(indexb+nrow-1)], scrtch, nrow, ncol, last, iflag)
+        @views bloks = IA[i]
+        info = @views factor(bloks, ipivot[indexx:indexx+nrow-1], scrtch, nrow, ncol, last, info)
+        (info !== 0) && break
 
-        ((iflag == 0) || (i == nbloks)) && return
+        i == nbloks && return info
         i = i+1
-        ncoli = IA.cols[i]
-
-        @views blok_next = IA[i]
-        @views shift(blok,ipivot[indexb:(indexb+nrow-1)],nrow,ncol,last,blok_next, ncoli)
-        indexb = indexb + nrow
+        indexx = indexx + last
+        ncol_next = IA.cols[i]
+        @views bloks_next = IA[i]
+        @views shift(bloks, nrow, ncol, last, bloks_next, ncol_next)
     end
+    info = info + indexx - 1
+    return info
 end
-function factor(w, ipivot, d, nrow, ncol, last, iflag)
-    for i = 1:nrow
-        ipivot[i] = i
-        rowmax = 0.0
-        for j=1:ncol
-            rowmax = max(rowmax, abs(w[i,j]))
-        end
-        if rowmax == 0
-            iflag = 0
-            return
-        end
-        d[i] = rowmax
+
+function factor(w::AbstractArray{T}, ipivot, d, nrow, ncol, last, info) where {T}
+    for  i = 1:nrow
+        d[i] = 0.0
     end
 
+    for j = 1:ncol
+        for i = 1:nrow
+          d[i] = max(d[i], abs(w[i, j]))
+        end
+    end
     k = 1
-    ipivk = 0
     while k <= last
-        ipivk = ipivot[k]
-        if k == nrow
-            if abs(w[ipivk, nrow]) + d[ipivk] > d[ipivk]
-                return
-            end
+        if d[k] == 0.0
+            return k
         end
-        j = k
+        (k == nrow) && (@goto n80)
+        l = k
         kp1 = k+1
-        colmax = abs(w[ipivk, k])/d[ipivk]
-        for i=kp1:nrow
-            ipivi = ipivot[i]
-            awikdi = abs(w[ipivi, k])/d[ipivi]
-            if awikdi <= colmax
-                continue
+        colmax = abs(w[k, k]) / d[k]
+
+        for i = kp1:nrow
+            if abs(w[i, k]) > colmax * d[i] 
+                colmax = abs(w[i, k]) / d[i]
+                l = i
             end
-            colmax = awikdi
-            j = i
         end
-        if j !== k
-            ipivk = ipivot[j]
-            ipivot[j] = ipivot[k]
-            ipivot[k] = ipivk
-            iflag = -iflag
+        ipivot[k] = l
+        t = w[l, k]
+        s = d[l]
+        if l !== k
+            w[l, k] = w[k, k]
+            w[k, k] = t
+            d[l] = d[k]
+            d[k] = s
+        end
+        if abs(t)+d[k] <= d[k]
+            return k
         end
 
-        if abs(w[ipivk, k]) + d[ipivk] <= d[ipivk]
-            iflag = 0
-            return
-        end
+        t = -1.0/t
         for i = kp1:nrow
-            ipivi = ipivot[i]
-            w[ipivi, k] = w[ipivi, k]/w[ipivk, k]
-            ratio = -w[ipivi, k]
-            for j = kp1:ncol
-                w[ipivi, j] = ratio*w[ipivk, j] + w[ipivi, j]
+            w[i, k] = w[i, k] * t
+        end
+        for j=kp1:ncol
+            t = w[l, j]
+            if l !== k
+                w[l,j] = w[k,j]
+                w[k,j] = t
+            end
+            if t !== 0
+                for i = kp1:nrow
+                    w[i,j] = w[i,j] + w[i,k] * t
+                end
             end
         end
         k = kp1
     end
-    if abs(w[ipivk, k]) + d[ipivk] <= d[ipivk]
-        iflag = 0
-        return
-    end
+    return info
+
+    @label n80
+
+    (abs(w[nrow, nrow])+d[nrow] > d[nrow]) && return info
+    info = k
+    return info
 end
 
-function shift(ai, ipivot, nrowi, ncoli, last, ai1, ncoli1)
+function shift(ai::AbstractArray{T}, nrowi::I, ncoli::I, last::I, ai1::AbstractArray{T}, ncoli1::I) where {I <: Integer, T}
     mmax = nrowi - last
     jmax = ncoli - last
-    ((mmax < 1) || (jmax < 1)) && return
+    (mmax < 1 || jmax < 1)   &&   return
 
-    for m=1:mmax
-        ip = ipivot[last+m]
-        for j=1:jmax
-            ai1[m,j] = ai[ip,last+j]
+    for j=1:jmax
+        for m=1:mmax
+            ai1[m, j] = ai[last+m,last+j]
         end
     end
-    (jmax == ncoli1) && return
+    (jmax == ncoli1)  &&   return
 
     jmaxp1 = jmax + 1
     for j=jmaxp1:ncoli1
-        for m=1:mmax
-            ai1[m,j] = 0.0
+	    for m=1:mmax
+            ai1[m, j] = 0.0
         end
     end
+    return
 end
 
-function substitution(IA, ipivot, b, x)
-    index = 1
-    indexb = 1
+function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, x) where {I <: Integer}
+
+#  forward substitution
+
     indexx = 1
+    last = 0
     nbloks = nblocks(IA)
-    for i=1:nbloks
-        nrow = IA.rows[i]
-        ncol = IA.cols[i]
-        last = IA.lasts[i]
-        @views blok = IA[i]
-        @views forward_substitution(blok,ipivot[indexb:(indexb+nrow-1)],nrow,last,b[indexb:(indexb+2*nrow-last-1)], x[indexx:(indexx+nrow-1)])
-        index = nrow*ncol + index
-        indexb = indexb + nrow
+    for i = 1:nbloks
+	    nrow = IA.rows[i]
+	    last = IA.lasts[i]
+
+        @views bloks = IA[i]
+	    @views forward_substitution(bloks, ipivot[indexx:indexx+last-1], nrow, last, x[indexx:indexx+nrow-1])
+
         indexx = indexx + last
     end
 
-    nbp1 = nbloks + 1
-    for j=1:nbloks
-         i = nbp1 - j
-         nrow = IA.rows[i]
-         ncol = IA.cols[i]
-         last = IA.lasts[i]
-         index = index - nrow*ncol
-         indexb = indexb - nrow
-         indexx = indexx - last
-         @views blok = IA[i]
-        @views backward_substitution(blok,ipivot[indexb:(indexb+nrow-1)],ncol,last,x[indexx:(indexx+ncol-1)])
+#  back substitution
+
+    nbp1::Int = nbloks + 1
+    for j = 1:nbloks
+	    i = nbp1 - j
+	    ncol::Int = IA.cols[i]
+	    last = IA.lasts[i]
+	    indexx = indexx - last
+
+        @views bloks = IA[i]
+        @views backward_substitution(bloks, ncol, last, x[indexx:indexx+ncol-1])
     end
+    return
 end
-function forward_substitution(w, ipivot, nrow, last, b, x)
-    ip = ipivot[1]
-    x[1] = b[ip]
-    (nrow == 1) && return
-    for k=2:nrow
-        ip = ipivot[k]
-        jmax = min(k-1,last)
-        sum = 0.0
-        for j=1:jmax
-            sum = w[ip,j]*x[j] + sum
-        end
-        x[k] = b[ip] - sum
-    end
-    nrowml = nrow - last
-    (nrowml == 0) && return
-    lastp1 = last+1
-    for k=lastp1:nrow
-        b[nrowml+k] = x[k]
-    end
-end
-function backward_substitution(w, ipivot, ncol, last, x)
-    k = last
-    ip = ipivot[k]
-    sum = 0.0
-    if k !== ncol
-        kp1 = k+1
-        @label backward_substitution2
-        for j=kp1:ncol
-            sum = w[ip,j]*x[j] + sum
+
+function forward_substitution(w::AbstractArray{T}, ipivot, nrow::I, last::I, x) where {I <: Integer, T}
+    nrow == 1       &&        return
+    lstep = min(nrow-1 , last)
+    for k = 1:lstep
+	    kp1 = k + 1
+	    ip = ipivot[k]
+	    t = x[ip]
+	    x[ip] = x[k]
+	    x[k] = t
+	    if t !== 0.0
+            for i = kp1:nrow
+                x[i] = x[i] + w[i,k] * t
+            end
         end
     end
-    x[k] = (x[k] - sum)/w[ip,k]
-    (k == 1) && return
-    kp1 = k
-    k = k-1
-    ip = ipivot[k]
-    sum = 0.0
-    @goto backward_substitution2
+    return
+end
+
+function backward_substitution(w::AbstractArray{T}, ncol::I, last::I, x) where {I <: Integer, T}
+    lp1 = last + 1
+    if ( lp1 <= ncol )
+        for j = lp1:ncol
+	        t = - x[j]
+	        if t !== 0.0
+	            for i = 1:last
+                    x[i] = x[i] + w[i, j] * t
+                end
+            end
+        end
+    end
+    if last !== 1
+        lm1 = last - 1
+        for kb = 1:lm1
+            km1 = last - kb
+            k = km1 + 1
+            x[k] = x[k]/w[k, k]
+            t = - x[k]
+            if t !== 0.0
+                for i = 1:km1
+                    x[i] = x[i] + w[i, k] * t
+                end
+            end
+        end
+    end
+    x[1] = x[1]/w[1, 1]
+    return
 end
 
 export AlmostBlockDiagonal, IntermediateAlmostBlockDiagonal
