@@ -4,7 +4,7 @@ using ConcreteStructs
 import Base.\
 
 """
-    AlmostBlockDiagonal(T, V<:AbstractMatrix{T}) < AbstractMatrix{T}
+    AlmostBlockDiagonal{T, I <: Integer, V <: AbstractMatrix{T}} <: AbstractMatrix{T}
 
 A matrix with block matrices on the diagonal, but not strictly has their corner against each other.
 
@@ -34,6 +34,9 @@ of the almost block diagonal matrix, which is the offset of each adjacent block.
 
 ! note
     The column of block `ncol` and row of block `nrow` must satisfy: `ncol` ≥ `nrow`.
+
+The implementation mainly comes from the paper: [SOLVEBLOK: A Package for Solving Almost Block Diagonal Linear Systems](https://dl.acm.org/doi/pdf/10.1145/355873.355880)
+which is originally a FORTRAN program for the solution of an almost block diagonal system by gaussian elimination with scale row pivoting.
 """
 @concrete struct AlmostBlockDiagonal{T, I <: Integer, V <: AbstractMatrix{T}} <: AbstractMatrix{T}
     blocks::Vector{V}
