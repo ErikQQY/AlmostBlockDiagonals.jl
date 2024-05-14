@@ -119,6 +119,7 @@ Return the number of on-diagonal blocks.
 nblocks(A::AlmostBlockDiagonal) = length(blocks(A))
 
 Base.size(A::AlmostBlockDiagonal) = (sum(size(A.blocks[i], 1) for i =1:nblocks(A)), sum(A.lasts))
+Base.deepcopy(A::AlmostBlockDiagonal) = AlmostBlockDiagonal(deepcopy(A.blocks), A.lasts)
 
 Base.getindex(A::AlmostBlockDiagonal, i::Integer) = A.blocks[i]
 function Base.getindex(A::AlmostBlockDiagonal, i::Integer, j::Integer)
@@ -146,8 +147,8 @@ function check_index(A::AlmostBlockDiagonal, i::Integer)
 end
 
 getblock(A::AlmostBlockDiagonal, p::Integer) = blocks(A)[p]
-function getblock(A::AlmostBlockDiagonal, p::Integer, q::Integer) where T
-    return p == q ? blocks(A)[p] : Zeros{T}(blocksize(B, p, q))
+function getblock(A::AlmostBlockDiagonal{T}, p::Integer, q::Integer) where T
+    return p == q ? blocks(A)[p] : zeros{T}(blocksize(B, p, q))
 end
 
 blocks(A::IntermediateAlmostBlockDiagonal) = A.blocks
@@ -190,15 +191,16 @@ function check_index(A::IntermediateAlmostBlockDiagonal, i::Integer)
 end
 
 getblock(A::IntermediateAlmostBlockDiagonal, p::Integer) = blocks(A)[p]
-function getblock(A::IntermediateAlmostBlockDiagonal, p::Integer, q::Integer) where T
-    return p == q ? blocks(A)[p] : Zeros{T}(blocksize(B, p, q))
+function getblock(A::IntermediateAlmostBlockDiagonal{T}, p::Integer, q::Integer) where T
+    return p == q ? blocks(A)[p] : zeros{T}(blocksize(B, p, q))
 end
 
 function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T2}
     iflag = 1
-    IA = IntermediateAlmostBlockDiagonal(A)
-    scrtch = zeros(T2, length(B))
-    ipivot = zeros(Integer, length(B))
+    CA = deepcopy(A)
+    IA = IntermediateAlmostBlockDiagonal(CA)
+    scrtch = zeros(T2, last(size(A)))
+    ipivot = zeros(Integer, last(size(A)))
     @views factor_shift(IA, ipivot, scrtch)
     (iflag == 0) && return
     @views substitution(IA, ipivot, B)
@@ -239,8 +241,6 @@ function factor(w::AbstractArray{T}, ipivot, d, nrow::I, ncol::I, last::I, info)
           d[i] = max(d[i], abs(w[i, j]))
         end
     end
-    for i=1:nrow
-        d[i] = maximum(abs(w[]))
     k = 1
     while k <= last
         if d[k] == 0.0
