@@ -29,8 +29,7 @@ can be abstracted as:
 julia> AlmostBlockDiagonal([rand(3,4),rand(2,4),rand(2,4),rand(3,4)], [2,2,2,4])
 ```
 
-Here, the first argument is the fillers in the almost block diagonal matrix, the second argument is the structure
-of the almost block diagonal matrix, which is the offset of each adjacent block.
+Here, the first argument is the fillers in the almost block diagonal matrix, the second argument is the offset of each adjacent block in the diagonal.
 
 ! note
     The column of block `ncol` and row of block `nrow` must satisfy: `ncol` ≥ `nrow`.
@@ -236,7 +235,7 @@ function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractAr
     return info
 end
 
-function factor(w::AbstractArray{T}, ipivot, d, nrow::I, ncol::I, last::I, info) where {I <: Integer, T}
+function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol::I, last::I, info::I) where {I <: Integer, T}
     d = zeros(T, nrow)
 
     for j = 1:ncol
@@ -353,7 +352,7 @@ function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray
     return
 end
 
-function forward_substitution(w::AbstractArray{T}, ipivot, nrow::I, last::I, x) where {I <: Integer, T}
+function forward_substitution(w::AbstractArray{T}, ipivot::AbstractArray{I}, nrow::I, last::I, x) where {I <: Integer, T}
     nrow == 1       &&        return
     lstep = min(nrow-1 , last)
     for k = 1:lstep
