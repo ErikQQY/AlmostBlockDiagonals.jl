@@ -137,6 +137,28 @@ function Base.getindex(A::AlmostBlockDiagonal, i::Integer, j::Integer)
     end
 end
 
+function Base.Matrix(A::AlmostBlockDiagonal{T}) where T
+    N = nblocks(A)
+    W = zeros(T, size(A))
+    rowsᵢ = cumsum(A.rows) .- A.rows .+ 1
+    rowsᵢ₊₁ = cumsum(A.rows)
+    colsᵢ = cumsum(A.lasts[1:end-1]) .+ 1
+    colsᵢ₊₁ = colsᵢ + A.cols[2:end] .- 1
+    for i in 1:N
+        if i == 1
+            W[1:A.rows[1], 1:A.cols[1]] = A.blocks[1]
+            continue
+        end
+        @views W[rowsᵢ[i]:rowsᵢ₊₁[i], colsᵢ[i-1]:colsᵢ₊₁[i-1]] = A.blocks[i]
+    end
+    return W
+end
+
+function Base.:*(A::AlmostBlockDiagonal{T, I, V}, x::AbstractVector{S}) where {I <: Integer, V <: AbstractArray, T, S}
+    MA = Matrix(A) * x
+    return MA
+end
+
 # check `i` located in m-th row
 function check_index(A::AlmostBlockDiagonal, i::Integer)
     accumulate_rows = cumsum(A.rows)
@@ -201,12 +223,16 @@ function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T
     iflag = 1
     CA = deepcopy(A)
     IA = IntermediateAlmostBlockDiagonal(CA)
-    scrtch = zeros(T2, last(size(A)))
-    ipivot = zeros(Integer, last(size(A)))
+    scrtch = zeros(T2, first(size(IA)))
+    ipivot = zeros(Integer, first(size(IA)))
     @views factor_shift(IA, ipivot, scrtch)
     (iflag == 0) && return
-    @views substitution(IA, ipivot, B)
-    return B
+    C = deepcopy(B)
+    @views substitution(IA, ipivot, C)
+    # when A is in the form of ABD with TOPBLK and BOTBLK, the first value in the solution
+    # should be the opposite sign
+    (A.lasts[1] == 0) ? (C[1] = -C[1]) : nothing
+    return C
 end
 
 function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractArray{I}, scrtch) where {I <: Integer, T}
