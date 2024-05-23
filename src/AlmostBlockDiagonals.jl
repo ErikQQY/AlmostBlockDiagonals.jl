@@ -281,9 +281,7 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol:
     end
     k = 1
     while k <= last
-        if d[k] == 0.0
-            return k
-        end
+        (d[k] == 0.0) && (@goto n90)
         (k == nrow) && (@goto n80)
         l = k
         kp1 = k+1
@@ -296,27 +294,25 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol:
             end
         end
         ipivot[k] = l
-        t = w[l, k]
+        t = copy(w[l, k])
         s = d[l]
         if l !== k
-            w[l, k] = w[k, k]
-            w[k, k] = t
-            d[l] = d[k]
-            d[k] = s
+            w[l, k] = copy(w[k, k])
+            w[k, k] = copy(t)
+            d[l] = copy(d[k])
+            d[k] = copy(s)
         end
-        if abs(t)+d[k] <= d[k]
-            return k
-        end
+        (abs(t)+d[k] <= d[k]) && (@goto n90)
 
         t = -1.0/t
         for i = kp1:nrow
             w[i, k] = w[i, k] * t
         end
         for j=kp1:ncol
-            t = w[l, j]
+            t = copy(w[l, j])
             if l !== k
-                w[l,j] = w[k,j]
-                w[k,j] = t
+                w[l,j] = copy(w[k,j])
+                w[k,j] = copy(t)
             end
             if t !== 0
                 for i = kp1:nrow
@@ -331,6 +327,9 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol:
     @label n80
 
     (abs(w[nrow, nrow])+d[nrow] > d[nrow]) && return info
+
+    @label n90
+
     info = k
     return info
 end
