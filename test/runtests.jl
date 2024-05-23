@@ -176,7 +176,7 @@ end
     B= [1.94,3.04,-0.83, -3.54,2.75,  1.32,2.35,1.96, 1.52,0.78,2.40]
     IA = IntermediateAlmostBlockDiagonal([a1, a2, a3, a4, a5], [2, 3, 1, 1, 4])
     ipivot = zeros(Integer, 16)
-    scrtch = zeros(Integer, 16)
+    scrtch = zeros(16)
     factor_shift(IA, ipivot, scrtch)
     substitution(IA, ipivot, B) # directly inplace computing
 

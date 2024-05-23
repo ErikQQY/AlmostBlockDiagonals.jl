@@ -270,7 +270,9 @@ function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractAr
 end
 
 function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol::I, last::I, info::I) where {I <: Integer, T}
-    d = zeros(T, nrow)
+    for i=1:nrow
+        d[i] = 0.0 # don't reassign values
+    end
 
     for j = 1:ncol
         for i = 1:nrow
