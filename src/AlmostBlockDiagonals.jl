@@ -228,13 +228,13 @@ function getblock(A::IntermediateAlmostBlockDiagonal{T}, p::Integer, q::Integer)
 end
 
 function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T2}
-    iflag = 1
+    iflag = 0
     CA = deepcopy(A)
     IA = IntermediateAlmostBlockDiagonal(CA)
     scrtch = zeros(T2, first(size(IA)))
     ipivot = zeros(Integer, first(size(IA)))
     iflag = @views factor_shift(IA, ipivot, scrtch)
-    (iflag == 0) && return
+    (iflag == 1) && return
     C = deepcopy(B)
     @views substitution(IA, ipivot, C)
     # when A is in the form of ABD with TOPBLK and BOTBLK, the first value in the solution
