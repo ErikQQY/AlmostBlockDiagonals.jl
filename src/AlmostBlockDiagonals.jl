@@ -145,6 +145,23 @@ function Base.getindex(A::AlmostBlockDiagonal, i::Integer, j::Integer)
     end
 end
 
+function Base.Matrix(IA::IntermediateAlmostBlockDiagonal{T}) where T
+    N = nblocks(IA)
+    W = zeros(T, size(IA))
+    rowsᵢ = cumsum(IA.rows) .- IA.rows .+ 1
+    rowsᵢ₊₁ = cumsum(IA.rows)
+    colsᵢ = cumsum(IA.lasts[1:end-1]) .+ 1
+    colsᵢ₊₁ = colsᵢ + IA.cols[2:end] .- 1
+    for i in 1:N
+        if i == 1
+            W[1:IA.rows[1], 1:IA.cols[1]] = IA.blocks[1]
+            continue
+        end
+        @views W[rowsᵢ[i]:rowsᵢ₊₁[i], colsᵢ[i-1]:colsᵢ₊₁[i-1]] = IA.blocks[i]
+    end
+    return W
+end
+
 function Base.Matrix(A::AlmostBlockDiagonal{T}) where T
     N = nblocks(A)
     W = zeros(T, size(A))
