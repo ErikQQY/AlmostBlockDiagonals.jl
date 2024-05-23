@@ -66,7 +66,7 @@ use for pivoting LU factorization.
     lasts::Vector{I}
     rows::Vector{I}
     cols::Vector{I}
-    fillers::Vector{I}
+    fillers::Union{Vector{I}, Nothing}
 
     function IntermediateAlmostBlockDiagonal{T, I, V}(blocks::Vector{V}, lasts, rows, cols, fillers) where {T, I <: Integer, V <: AbstractMatrix{T}}
         return new{T, I, V}(blocks, lasts, rows, cols, fillers)
@@ -78,6 +78,14 @@ function IntermediateAlmostBlockDiagonal(blocks::Vector{V}, lasts::Vector{I}, fi
     rows = first.(rows_and_cols)
     cols = last.(rows_and_cols)
     return IntermediateAlmostBlockDiagonal{T, I, V}(blocks, lasts, rows, cols, fillers)
+end
+
+# construct an intermediate almost block diagonals directly from blocks and lasts input
+function IntermediateAlmostBlockDiagonal(blocks::Vector{V}, lasts::Vector{I}) where {T, I <: Integer, V<:AbstractMatrix{T}}
+    rows_and_cols = size.(blocks)
+    rows = first.(rows_and_cols)
+    cols = last.(rows_and_cols)
+    return IntermediateAlmostBlockDiagonal{T, I, V}(blocks, lasts, rows, cols, nothing)
 end
 
 IntermediateAlmostBlockDiagonal(A::IntermediateAlmostBlockDiagonal) = A
@@ -225,7 +233,7 @@ function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T
     IA = IntermediateAlmostBlockDiagonal(CA)
     scrtch = zeros(T2, first(size(IA)))
     ipivot = zeros(Integer, first(size(IA)))
-    @views factor_shift(IA, ipivot, scrtch)
+    iflag = @views factor_shift(IA, ipivot, scrtch)
     (iflag == 0) && return
     C = deepcopy(B)
     @views substitution(IA, ipivot, C)
@@ -633,5 +641,6 @@ function subbak(w, nrow, ncol, last, x)
 end
 
 export AlmostBlockDiagonal, IntermediateAlmostBlockDiagonal
+export factor_shift, substitution
 
 end
