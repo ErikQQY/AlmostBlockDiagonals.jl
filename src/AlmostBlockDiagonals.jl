@@ -373,8 +373,7 @@ function shift(ai::AbstractArray{T}, nrowi::I, ncoli::I, last::I, ai1::AbstractA
 end
 
 function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, x) where {I <: Integer}
-
-#  forward substitution
+    #  forward substitution
 
     indexx = 1
     last = 0
@@ -389,7 +388,7 @@ function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray
         indexx = indexx + last
     end
 
-#  back substitution
+    #  back substitution
 
     nbp1::Int = nbloks + 1
     for j = 1:nbloks
@@ -555,7 +554,7 @@ function shiftb(ai, nrowi::Int, ncoli::Int, last, ai1, nrowi1::Int, ncoli1::Int)
     jmax = ncoli - last
     (mmax < 1 || jmax < 1)   &&   return
 
-#  put the remainder of block i into ai1
+    #  put the remainder of block i into ai1
 
     for j=1:jmax
         for m=1:mmax
@@ -564,7 +563,7 @@ function shiftb(ai, nrowi::Int, ncoli::Int, last, ai1, nrowi1::Int, ncoli1::Int)
     end
     (jmax == ncoli1)  &&   return
 
-#  zero out the upper right corner of ai1
+    #  zero out the upper right corner of ai1
 
     jmaxp1 = jmax + 1
     for j=jmaxp1:ncoli1
@@ -577,7 +576,7 @@ function shiftb(ai, nrowi::Int, ncoli::Int, last, ai1, nrowi1::Int, ncoli1::Int)
 end
 
 function sbblok(bloks, integs, nbloks, ipivot, x)
-#  forward substitution pass
+    #  forward substitution pass
 
     index::Int = 1
     indexx::Int = 1
@@ -592,7 +591,7 @@ function sbblok(bloks, integs, nbloks, ipivot, x)
         indexx = indexx + last
     end
     
-#  back substitution pass
+    #  back substitution pass
 
     nbp1::Int = nbloks + 1
     for j = 1:nbloks
