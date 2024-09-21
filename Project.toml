@@ -1,7 +1,7 @@
 name = "AlmostBlockDiagonals"
 uuid = "a95523ee-d6da-40b5-98cc-27bc505739d5"
-authors = ["Qingyu Qu"]
-version = "0.1.6"
+authors = ["Qingyu Qu <erikqqy123@gmail.com>"]
+version = "0.1.7"
 
 [deps]
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"

@@ -244,7 +244,7 @@ function getblock(A::IntermediateAlmostBlockDiagonal{T}, p::Integer, q::Integer)
     return p == q ? blocks(A)[p] : zeros{T}(blocksize(B, p, q))
 end
 
-function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T2}
+function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractArray{T2}) where {T, T2 <: Real}
     iflag = 0
     CA = deepcopy(A)
     IA = IntermediateAlmostBlockDiagonal(CA)
@@ -260,6 +260,11 @@ function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T
     return C
 end
 
+"""
+    factor_shift(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, scrtch)
+
+Factorize the intermediate representation of almost block diagonals matrix `IA[i]` and then shift to prepare the next block `IA[i+1]`.
+"""
 function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractArray{I}, scrtch) where {I <: Integer, T}
     info = 0
     indexx = 1
@@ -268,25 +273,24 @@ function factor_shift(IA::IntermediateAlmostBlockDiagonal{T}, ipivot::AbstractAr
 
     while true
         nrow = IA.rows[i]
-        ncol = IA.cols[i]
         last = IA.lasts[i]
 
         @views bloks = IA[i]
-        info = @views factor(bloks, ipivot[indexx:indexx+nrow-1], scrtch, nrow, ncol, last, info)
+        info = @views factor(bloks, ipivot[indexx:indexx+nrow-1], scrtch, last, info)
         (info !== 0) && break
 
         i == nbloks && return info
         i = i+1
         indexx = indexx + last
-        ncol_next = IA.cols[i]
         @views bloks_next = IA[i]
-        @views shift(bloks, nrow, ncol, last, bloks_next, ncol_next)
+        @views shift(bloks, last, bloks_next)
     end
     info = info + indexx - 1
     return info
 end
 
-function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol::I, last::I, info::I) where {I <: Integer, T}
+function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, last::I, info::I) where {I <: Integer, T}
+    nrow, ncol = size(w)
     for i=1:nrow
         d[i] = 0.0 # don't reassign values
     end
@@ -351,7 +355,9 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, nrow::I, ncol:
     return info
 end
 
-function shift(ai::AbstractArray{T}, nrowi::I, ncoli::I, last::I, ai1::AbstractArray{T}, ncoli1::I) where {I <: Integer, T}
+function shift(ai::AbstractArray{T}, last::I, ai1::AbstractArray{T}) where {I <: Integer, T}
+    nrowi, ncoli = size(ai)
+    ncoli1, _ = size(ai1)
     mmax = nrowi - last
     jmax = ncoli - last
     (mmax < 1 || jmax < 1)   &&   return
@@ -372,7 +378,20 @@ function shift(ai::AbstractArray{T}, nrowi::I, ncoli::I, last::I, ai1::AbstractA
     return
 end
 
-function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, x) where {I <: Integer}
+@views function recursive_unflatten!(y::Vector{Vector{T}}, x::AbstractArray) where {T}
+    i = 0
+    for yᵢ in y
+        copyto!(yᵢ, x[(i + 1):(i + length(yᵢ))])
+        i += length(yᵢ)
+    end
+end
+
+"""
+    substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, x)
+
+Proceed with forward and backward substitution to solve the ADB linear system
+"""
+function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, x::AbstractArray{T}) where {I <: Integer, T <: Real}
     #  forward substitution
 
     indexx = 1
@@ -383,7 +402,7 @@ function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray
 	    last = IA.lasts[i]
 
         @views bloks = IA[i]
-	    @views forward_substitution(bloks, ipivot[indexx:indexx+last-1], nrow, last, x[indexx:indexx+nrow-1])
+	    @views forward_substitution(bloks, ipivot[indexx:indexx+last-1], last, x[indexx:indexx+nrow-1])
 
         indexx = indexx + last
     end
@@ -398,12 +417,46 @@ function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray
 	    indexx = indexx - last
 
         @views bloks = IA[i]
-        @views backward_substitution(bloks, ncol, last, x[indexx:indexx+ncol-1])
+        @views backward_substitution(bloks, last, x[indexx:indexx+ncol-1])
     end
     return
 end
+# another dispatch for substitution when input x is a vector of vectors
+function substitution(IA::IntermediateAlmostBlockDiagonal, ipivot::AbstractArray{I}, vx::Vector{Vector{T}}) where {I <: Integer, T}
+    x = reduce(vcat, vx)
+    #  forward substitution
 
-function forward_substitution(w::AbstractArray{T}, ipivot::AbstractArray{I}, nrow::I, last::I, x) where {I <: Integer, T}
+    indexx = 1
+    last = 0
+    nbloks = nblocks(IA)
+    for i = 1:nbloks
+	    nrow = IA.rows[i]
+	    last = IA.lasts[i]
+
+        @views bloks = IA[i]
+	    @views forward_substitution(bloks, ipivot[indexx:indexx+last-1], last, x[indexx:indexx+nrow-1])
+
+        indexx = indexx + last
+    end
+
+    #  back substitution
+
+    nbp1::Int = nbloks + 1
+    for j = 1:nbloks
+	    i = nbp1 - j
+	    ncol::Int = IA.cols[i]
+	    last = IA.lasts[i]
+	    indexx = indexx - last
+
+        @views bloks = IA[i]
+        @views backward_substitution(bloks, last, x[indexx:indexx+ncol-1])
+    end
+    recursive_unflatten!(vx, x)
+    return
+end
+
+function forward_substitution(w::AbstractArray{T}, ipivot::AbstractArray{I}, last::I, x) where {I <: Integer, T}
+    nrow, _ = size(w)
     nrow == 1       &&        return
     lstep = min(nrow-1 , last)
     for k = 1:lstep
@@ -421,9 +474,10 @@ function forward_substitution(w::AbstractArray{T}, ipivot::AbstractArray{I}, nro
     return
 end
 
-function backward_substitution(w::AbstractArray{T}, ncol::I, last::I, x) where {I <: Integer, T}
+function backward_substitution(w::AbstractArray{T}, last::I, x) where {I <: Integer, T}
+    _, ncol = size(w)
     lp1 = last + 1
-    if ( lp1 <= ncol )
+    if lp1 <= ncol
         for j = lp1:ncol
 	        t = - x[j]
 	        if t !== 0.0
