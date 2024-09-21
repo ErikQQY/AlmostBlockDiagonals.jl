@@ -244,7 +244,7 @@ function getblock(A::IntermediateAlmostBlockDiagonal{T}, p::Integer, q::Integer)
     return p == q ? blocks(A)[p] : zeros{T}(blocksize(B, p, q))
 end
 
-function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractArray{T2}) where {T, T2 <: Real}
+function Base.:\(A::AlmostBlockDiagonal{T}, B::AbstractVecOrMat{T2}) where {T, T2 <: Real}
     iflag = 0
     CA = deepcopy(A)
     IA = IntermediateAlmostBlockDiagonal(CA)
