@@ -184,6 +184,24 @@ function Base.:*(A::AlmostBlockDiagonal{T, I, V}, x::AbstractVector{S}) where {I
     return MA
 end
 
+# ignore varying size of similar for now, since creating a larger size of a given
+# ABD matrix without providing additional blocks is nonsense
+function Base.similar(A::AlmostBlockDiagonal, ::Type{T}) where {T}
+    return AlmostBlockDiagonal(map(x -> similar(x, T), blocks(A)), A.lasts)
+end
+
+function Base.zero(A::AlmostBlockDiagonal{T, I, V}) where {V <: AbstractArray, I <: Integer, T}
+    AlmostBlockDiagonal(zero.(blocks(A)), A.lasts)
+end
+
+function Base.similar(A::IntermediateAlmostBlockDiagonal, ::Type{T}) where {T}
+    return IntermediateAlmostBlockDiagonal(map(x -> similar(x, T), blocks(A)), A.lasts)
+end
+
+function Base.zero(A::IntermediateAlmostBlockDiagonal{T, I, V}) where {V <: AbstractArray, I <: Integer, T}
+    IntermediateAlmostBlockDiagonal(zero.(blocks(A)), A.lasts)
+end
+
 # check `i` located in m-th row
 function check_index(A::AlmostBlockDiagonal, i::Integer)
     accumulate_rows = cumsum(A.rows)
@@ -227,6 +245,39 @@ function Base.getindex(A::IntermediateAlmostBlockDiagonal, i::Integer, j::Intege
         @inbounds return 0.0
     end
 end
+
+function Base.setindex!(A::AlmostBlockDiagonal, v, i, j)
+    nth_block_row, offset = check_index(A, i)
+    accumulate_lasts = cumsum(A.lasts)
+    jₐ = (nth_block_row == 1) ? 0 : accumulate_lasts[nth_block_row-1]
+    jᵦ = (nth_block_row == 1) ? A.cols[1] : accumulate_lasts[nth_block_row-1]+A.cols[nth_block_row]
+    if jₐ < j <= jᵦ
+        A.blocks[nth_block_row][offset, j-jₐ] = v
+    else
+        throw(ArgumentError(
+        "Cannot set entry ($i, $j) in off-almost-diagonal-block to nonzero value $v."
+    ))
+    end
+end
+
+function Base.setindex!(A::IntermediateAlmostBlockDiagonal, v, i, j)
+    nth_block_row, offset = check_index(A, i)
+    accumulate_lasts = cumsum(A.lasts)
+    jₐ = (nth_block_row == 1) ? 0 : accumulate_lasts[nth_block_row-1]
+    jᵦ = (nth_block_row == 1) ? A.cols[1] : accumulate_lasts[nth_block_row-1]+A.cols[nth_block_row]
+    if jₐ < j <= jᵦ
+        A.blocks[nth_block_row][offset, j-jₐ] = v
+    else
+        throw(ArgumentError(
+        "Cannot set entry ($i, $j) in off-almost-diagonal-block to nonzero value $v."
+    ))
+    end
+end
+
+Base.fill!(A::AlmostBlockDiagonal, x) = fill!.(A.blocks, x);
+Base.fill!(A::IntermediateAlmostBlockDiagonal, x) = fill!.(A.blocks, x);
+
+Base.:/(A::AlmostBlockDiagonal, n::Number) = AlmostBlockDiagonal(map(x -> x/n, blocks(A)), A.lasts)
 
 # check `i` located in m-th row
 function check_index(A::IntermediateAlmostBlockDiagonal, i::Integer)
