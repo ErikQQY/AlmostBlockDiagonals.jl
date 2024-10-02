@@ -342,9 +342,7 @@ end
 
 function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, last::I, info::I) where {I <: Integer, T}
     nrow, ncol = size(w)
-    for i=1:nrow
-        d[i] = 0.0 # don't reassign values
-    end
+    d[1:nrow] .= T(0) # don't reassign values
 
     for j = 1:ncol
         for i = 1:nrow
@@ -377,20 +375,14 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, last::I, info:
         (abs(t)+d[k] <= d[k]) && (@goto n90)
 
         t = -1.0/t
-        for i = kp1:nrow
-            w[i, k] = w[i, k] * t
-        end
+        w[kp1:nrow, k] .= w[kp1:nrow, k] .* t
         for j=kp1:ncol
             t = copy(w[l, j])
             if l !== k
                 w[l,j] = copy(w[k,j])
                 w[k,j] = copy(t)
             end
-            if t !== 0
-                for i = kp1:nrow
-                    w[i,j] = w[i,j] + w[i,k] * t
-                end
-            end
+            (t !== 0) && (w[kp1:nrow, j] .+= w[kp1:nrow, k] .* t)
         end
         k = kp1
     end
@@ -398,7 +390,7 @@ function factor(w::AbstractArray{T}, ipivot::AbstractArray{I}, d, last::I, info:
 
     @label n80
 
-    (abs(w[nrow, nrow])+d[nrow] > d[nrow]) && return info
+    (abs(w[nrow, nrow]) + d[nrow] > d[nrow]) && return info
 
     @label n90
 
@@ -413,19 +405,10 @@ function shift(ai::AbstractArray{T}, last::I, ai1::AbstractArray{T}) where {I <:
     jmax = ncoli - last
     (mmax < 1 || jmax < 1)   &&   return
 
-    for j=1:jmax
-        for m=1:mmax
-            ai1[m, j] = ai[last+m,last+j]
-        end
-    end
+    ai1[1:mmax, 1:jmax] = copy(ai[(last+1):(last+mmax), (last+1):(last+jmax)])
     (jmax == ncoli1)  &&   return
 
-    jmaxp1 = jmax + 1
-    for j=jmaxp1:ncoli1
-	    for m=1:mmax
-            ai1[m, j] = 0.0
-        end
-    end
+    ai1[1:mmax, jmax+1:ncoli1] .= T(0)
     return
 end
 
@@ -509,18 +492,14 @@ end
 function forward_substitution(w::AbstractArray{T}, ipivot::AbstractArray{I}, last::I, x) where {I <: Integer, T}
     nrow, _ = size(w)
     nrow == 1       &&        return
-    lstep = min(nrow-1 , last)
+    lstep = min(nrow-1, last)
     for k = 1:lstep
 	    kp1 = k + 1
 	    ip = ipivot[k]
 	    t = x[ip]
 	    x[ip] = x[k]
 	    x[k] = t
-	    if t !== 0.0
-            for i = kp1:nrow
-                x[i] = x[i] + w[i,k] * t
-            end
-        end
+	    (t !== 0.0) && (x[kp1:nrow] .+= w[kp1:nrow, k] .* t)
     end
     return
 end
@@ -531,11 +510,7 @@ function backward_substitution(w::AbstractArray{T}, last::I, x) where {I <: Inte
     if lp1 <= ncol
         for j = lp1:ncol
 	        t = - x[j]
-	        if t !== 0.0
-	            for i = 1:last
-                    x[i] = x[i] + w[i, j] * t
-                end
-            end
+	        (t !== 0.0) && (x[1:last] .+= w[1:last, j] .* t)
         end
     end
     if last !== 1
@@ -545,11 +520,7 @@ function backward_substitution(w::AbstractArray{T}, last::I, x) where {I <: Inte
             k = km1 + 1
             x[k] = x[k]/w[k, k]
             t = - x[k]
-            if t !== 0.0
-                for i = 1:km1
-                    x[i] = x[i] + w[i, k] * t
-                end
-            end
+            (t !== 0.0) && (x[1:km1] .+= w[1:km1, k] .* t)
         end
     end
     x[1] = x[1]/w[1, 1]
