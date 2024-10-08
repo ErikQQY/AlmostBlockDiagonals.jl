@@ -1,17 +1,22 @@
 name = "AlmostBlockDiagonals"
 uuid = "a95523ee-d6da-40b5-98cc-27bc505739d5"
 authors = ["Qingyu Qu <erikqqy123@gmail.com>"]
-version = "0.1.10"
+version = "0.1.11"
 
 [deps]
 ConcreteStructs = "2569d6c7-a4a2-43d3-a901-331e8e4be471"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 
 [compat]
 ConcreteStructs = "0.2"
+JET = "0.9"
+PrecompileTools = "1"
+Test = "1.10"
 julia = "1.10"
 
 [extras]
+JET = "c3a54625-cd67-489e-a8e7-0a5a0ff4e31b"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "JET"]
