@@ -1,6 +1,7 @@
 module AlmostBlockDiagonals
 
 using ConcreteStructs
+import PrecompileTools: @setup_workload, @compile_workload
 import Base.\
 
 """
@@ -525,6 +526,29 @@ function backward_substitution(w::AbstractArray{T}, last::I, x) where {I <: Inte
     end
     x[1] = x[1]/w[1, 1]
     return
+end
+
+# ---------------------
+# Precompile Some Stuff
+# ---------------------
+
+@setup_workload begin
+    a1 = [ 0.1   2.0  -0.1  -0.1
+        0.2  -0.2  -0.2   4.0
+        -1.0   0.3  -0.3   0.3 ]
+    a2 = [-0.4  0.4  -5.0
+        3.0  0.5  -0.5 ]
+    a3 = [ 0.6  -0.6  -0.6   5.0
+        0.5   4.0   0.5  -0.5
+        3.0   0.4  -0.4   0.4 ]
+    a4 = [ 0.3  -0.3  0.3  7.0 ]
+    a5 = [ 0.2  -0.2  -0.2   8.0
+        6.0   0.1  -0.1  -0.1 ]
+    @compile_workload begin
+        A = AlmostBlockDiagonal([a1, a2, a3, a4, a5], [2, 3, 1, 1, 4])
+        B = [1.94,3.04,-0.83,-3.54,2.75,1.32,2.35,1.96,1.52,0.78,2.40]
+        A\B
+    end
 end
 
 export AlmostBlockDiagonal, IntermediateAlmostBlockDiagonal

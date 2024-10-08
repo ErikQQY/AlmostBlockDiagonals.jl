@@ -1,5 +1,6 @@
 using AlmostBlockDiagonals
 using Test
+using JET
 
 @testset "Test Linear Solve in AlmostBlockDiagonals.jl" begin
     a1 = [ 0.1   2.0  -0.1  -0.1
@@ -227,4 +228,23 @@ end
     @test IA[4, 3] == 100.0
     @test_nowarn fill!(IA, 0.0)
     @test_nowarn similar(IA)
+end
+
+@testset "JET tests" begin
+    a1 = [ 0.1   2.0  -0.1  -0.1
+    0.2  -0.2  -0.2   4.0
+    -1.0   0.3  -0.3   0.3]
+    a2 = [-0.4  0.4  -5.0
+     3.0  0.5  -0.5]
+    a3 = [0.6  -0.6  -0.6   5.0
+    0.5   4.0   0.5  -0.5
+    3.0   0.4  -0.4   0.4]
+    a4 = [0.3  -0.3  0.3  7.0]
+    a5 = [0.2  -0.2  -0.2   8.0
+    6.0   0.1  -0.1  -0.1]
+    A = AlmostBlockDiagonal([a1, a2, a3, a4, a5], [2, 3, 1, 1, 4])
+    B = [1.94,3.04,-0.83, -3.54,2.75,1.32,2.35,1.96,1.52,0.78,2.40]
+
+    @test_call target_modules=(AlmostBlockDiagonals,) A\B
+    @test_opt target_modules=(AlmostBlockDiagonals,) A\B
 end
