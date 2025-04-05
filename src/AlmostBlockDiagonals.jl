@@ -16,13 +16,13 @@ A 10 x 10 matrix:
 x  x  x  x
 x  x  x  x
 x  x  x  x
-x  x  x  x
-x  x  x  x
-x  x  x  x
-x  x  x  x
-x  x  x  x
-x  x  x  x
-x  x  x  x
+0  0  x  x  x  x
+0  0  x  x  x  x
+0  0  0  0  x  x  x  x
+0  0  0  0  x  x  x  x
+0  0  0  0  0  0  x  x  x  x
+0  0  0  0  0  0  x  x  x  x
+0  0  0  0  0  0  x  x  x  x
 
 can be abstracted as:
 
